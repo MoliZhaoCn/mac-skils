@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 配置 pip 国内源（清华源）
+      - name: 配置 pip 国内源
+        run: pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 配置 npm 国内源（淘宝源）
+      - name: 配置 npm 国内源
+        run: npm config set registry https://registry.npmmirror.com
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      # 配置 Go proxy
+      - name: 配置 Go proxy
+        run: go env -w GOPROXY=https://goproxy.cn,direct
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pytest
+
+      - name: Install Node dependencies
+        run: |
+          npm ci
+          npm test
+
+      - name: Build Go
+        run: |
+          go mod download
+          go build ./...

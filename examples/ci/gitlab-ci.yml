@@ -1,0 +1,36 @@
+stages:
+  - test
+  - build
+
+variables:
+  # Go proxy
+  GOPROXY: "https://goproxy.cn,direct"
+
+before_script:
+  # 配置 pip 国内源（清华源）
+  - pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+  # 配置 npm 国内源（淘宝源）
+  - npm config set registry https://registry.npmmirror.com
+  # 配置 apt 国内源（清华源）
+  - sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true
+
+test:python:
+  stage: test
+  image: python:3.11
+  script:
+    - pip install -r requirements.txt
+    - pytest
+
+test:node:
+  stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm test
+
+build:go:
+  stage: build
+  image: golang:1.22
+  script:
+    - go mod download
+    - go build ./...
