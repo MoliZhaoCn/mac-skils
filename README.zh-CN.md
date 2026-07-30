@@ -18,6 +18,7 @@
 - Linux 解压时建议加 `--no-same-owner`
 - `apt` / `yum` / `dnf` / `apk` / `pip` / `npm` / `go` / `cargo` / `composer` 配置国内源
 - 覆盖 `Dockerfile`、`docker-compose`、GitHub Actions、GitLab CI、Jenkinsfile
+- Docker Compose 安全规则：bind mount 持久化（不用命名 volume）、端口绑定 127.0.0.1
 
 ## 功能特性
 
@@ -26,6 +27,7 @@
 - ✅ `apt` / `yum` / `dnf` / `apk` 国内源：清华源 / 阿里源
 - ✅ `pip` / `npm` / `go` / `cargo` / `composer` 国内源
 - ✅ Docker / CI / CD 配置感知
+- ✅ **Docker Compose**：所有持久化用 bind mount、端口绑定 127.0.0.1
 - ✅ 附带独立的验证脚本
 
 ## 安装
@@ -111,9 +113,11 @@ Claude Code 会自动加载 `~/.claude/skills/` 下的 skill。
 ├── references/
 │   ├── archive-cheatsheet.md   # tar/zip/rsync/scp 速查
 │   ├── sources-mirror.md       # 国内源映射表
-│   └── ownership-handling.md   # 所有权策略详解
+│   ├── ownership-handling.md   # 所有权策略详解
+│   └── docker-compose-cheatsheet.md  # Docker Compose 安全规则速查
 └── examples/
     ├── dockerfile/         # Dockerfile 示例
+    ├── docker-compose/     # Docker Compose 示例
     ├── ci/                 # CI 配置示例
     └── commands/           # 跨平台命令示例
 ```

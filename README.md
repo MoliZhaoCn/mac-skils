@@ -18,6 +18,7 @@ This skill makes AI assistants automatically apply cross-platform-safe rules whe
 - `--no-same-owner` advice when extracting on Linux
 - China-friendly mirrors for `apt`, `yum`, `dnf`, `apk`, `pip`, `npm`, `go`, `cargo`, `composer`
 - Coverage for `Dockerfile`, `docker-compose`, GitHub Actions, GitLab CI, Jenkinsfile
+- Docker Compose security rules: bind mounts (no named volumes), 127.0.0.1 port binding
 
 ## Features
 
@@ -26,6 +27,7 @@ This skill makes AI assistants automatically apply cross-platform-safe rules whe
 - ✅ `apt` / `yum` / `dnf` / `apk` mirrors: Tsinghua / Aliyun
 - ✅ `pip` / `npm` / `go` / `cargo` / `composer` mirrors
 - ✅ Docker / CI / CD configuration aware
+- ✅ **Docker Compose**: all persistence via bind mount, ports bound to 127.0.0.1
 - ✅ Standalone verification scripts
 
 ## Installation
@@ -111,9 +113,11 @@ Just work as usual — when AI detects macOS environment and you trigger any cro
 ├── references/
 │   ├── archive-cheatsheet.md   # tar/zip/rsync/scp reference
 │   ├── sources-mirror.md       # China mirror map
-│   └── ownership-handling.md   # Ownership strategy explained
+│   ├── ownership-handling.md   # Ownership strategy explained
+│   └── docker-compose-cheatsheet.md  # Docker Compose security rules
 └── examples/
     ├── dockerfile/         # Dockerfile examples
+    ├── docker-compose/     # Docker Compose examples
     ├── ci/                 # CI configuration examples
     └── commands/           # Cross-platform command examples
 ```
