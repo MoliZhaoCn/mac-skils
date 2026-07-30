@@ -309,7 +309,15 @@ multi_select() {
         printf '\033[2J\033[H'
         trap - EXIT INT TERM
     }
-    trap '__ms_cleanup' EXIT INT TERM
+    # 只让 EXIT 触发清理；INT/TERM 在 TUI 内被禁用，避免 Ctrl-C 退出脚本
+    # （用户必须显式按 Enter 才能确认，q 只是清空选择不退出）
+    trap '__ms_cleanup' EXIT
+
+    # 禁用 Ctrl-C 和 SIGTERM（在这段时间里），让 TUI 不被信号打断
+    trap '' INT
+    trap '' TERM
+    trap '' QUIT
+    trap '' TSTP
 
     # 渲染函数
     __ms_render() {
@@ -344,15 +352,15 @@ multi_select() {
     printf '\033[2J'
 
     # 主循环
-    # 注意：任何按键都不会意外退出循环，只有 Enter 才确认。
-    # ESC、未识别键、功能键等都安全忽略。
-    # read 失败（EOF/Ctrl-D）= 用户取消，退出循环（清空选择）。
+    # 严格限制：只有 Enter 确认；其他按键（除上下/空格/a/q 外）一律忽略。
+    # read 失败（Ctrl-D / EOF）= 视为取消，退出循环（清空选择）。
+    # 真 tty 下 Ctrl-C / Ctrl-D 都被禁用 trap 拦截（见 trap '' INT）。
     while true; do
         __ms_render
 
         # 读取按键
         local key
-        if ! IFS= read -r -s -n1 key 2>/dev/null; then
+        if ! IFS= read -r -s -n1 -t 0.3 key 2>/dev/null; then
             # EOF / Ctrl-D：视为用户取消
             selected=()
             for ((i=0; i<total; i++)); do selected[$i]=0; done
@@ -360,6 +368,14 @@ multi_select() {
         fi
 
         case "$key" in
+            $'\x03')
+                # Ctrl-C：完全忽略，继续循环（用户必须按 Enter 才能确认）
+                continue
+                ;;
+            $'\x04')
+                # Ctrl-D：完全忽略，继续循环
+                continue
+                ;;
             $'\x1b')
                 # ESC 序列（方向键 / 其他）
                 # 使用更长的超时，更宽容地接收多字节序列
@@ -368,7 +384,6 @@ multi_select() {
                 if IFS= read -r -s -n1 -t 0.5 b2 2>/dev/null; then
                     if [ "$b2" = "[" ] || [ "$b2" = "O" ]; then
                         # CSI / SS3 序列：吞掉中间字符直到最终字符
-                        # 最多再读 5 个字符，跳过数字/分号参数
                         local i=0
                         local ch=""
                         while [ $i -lt 5 ]; do
@@ -377,17 +392,15 @@ multi_select() {
                             fi
                             i=$((i+1))
                             seq="$seq$ch"
-                            # 如果是字母或 ~ 或 @ 等终止字符，停止
                             case "$ch" in
                                 [A-Za-z]|[~@]|\$|\^|_|`,`) break ;;
                             esac
                         done
                         seq="$b2$seq"
                     else
-                        # ESC + 单个其他字符（如 ESC O 然后是其他键）
                         seq="$b2"
                     fi
-                    # 现在解析完整序列
+                    # 解析完整序列（只接受方向键 / PageUp / PageDown / Home / End）
                     case "$seq" in
                         '[A'|'OA'|'[D'|'OD'|'[5~'|'[H')  # 上 / 左 / PageUp / Home
                             ((current--))
@@ -398,12 +411,12 @@ multi_select() {
                             [ $current -ge $total ] && current=0
                             ;;
                         *)
-                            # 其他 ESC 序列（Insert/Delete/F1-F12 等）：忽略
+                            # 其他 ESC 序列（Insert/Delete/F1-F12/Ctrl+Arrows 等）：忽略
                             :
                             ;;
                     esac
                 fi
-                # 单独的 ESC、或无法解析的序列 = 忽略（不退出），让用户继续编辑
+                # 单独的 ESC、或无法解析的序列 = 忽略
                 ;;
             ' ')
                 # 空格：切换当前项
@@ -428,7 +441,7 @@ multi_select() {
                 done
                 ;;
             'q'|'Q')
-                # q: 清空所有选择但不退出循环，让用户可以重新选
+                # q: 清空所有选择但不退出循环
                 selected=()
                 for ((i=0; i<total; i++)); do selected[$i]=0; done
                 ;;
