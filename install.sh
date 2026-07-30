@@ -254,6 +254,219 @@ remove_markers() {
 
 # ============ 辅助函数 ============
 
+# 交互式多选 TUI（类似 gum choose / whiptail，但不依赖外部工具）
+#
+# 用法:
+#   multi_select "<prompt>" "<option1>" "<option2>" ...
+#
+# 行为:
+#   - 上下箭头（或 k/j）切换当前项
+#   - 空格选中/取消当前项
+#   - a 切换全选/全不选
+#   - q 取消（清空选择）
+#   - Enter 确认
+#
+# 副作用:
+#   - 设置全局数组 RESULT（选中项的列表）
+multi_select() {
+    local prompt="$1"
+    shift
+    local -a options=("$@")
+    local total=${#options[@]}
+    local current=0
+    local -a selected
+    local i
+
+    # 初始化全部未选
+    for ((i=0; i<total; i++)); do
+        selected[$i]=0
+    done
+
+    # 保存终端状态
+    local saved_stty=""
+    if [ -t 0 ]; then
+        saved_stty=$(stty -g 2>/dev/null || echo "")
+    fi
+
+    # 隐藏光标
+    if command -v tput >/dev/null 2>&1 && [ -t 1 ]; then
+        tput civis 2>/dev/null || printf '\033[?25l'
+    else
+        printf '\033[?25l'
+    fi
+
+    # trap 恢复终端
+    __ms_cleanup() {
+        if command -v tput >/dev/null 2>&1 && [ -t 1 ]; then
+            tput cnorm 2>/dev/null || printf '\033[?25h'
+        else
+            printf '\033[?25h'
+        fi
+        if [ -n "$saved_stty" ]; then
+            stty "$saved_stty" 2>/dev/null || true
+        fi
+        # 清屏 + 移到顶部（避免半截 TUI 残留）
+        printf '\033[2J\033[H'
+        trap - EXIT INT TERM
+    }
+    trap '__ms_cleanup' EXIT INT TERM
+
+    # 渲染函数
+    __ms_render() {
+        # 移到屏幕顶部
+        printf '\033[H'
+
+        # 标题
+        printf '\033[1m%s\033[0m\n' "$prompt"
+        printf '\n'
+
+        for ((i=0; i<total; i++)); do
+            local mark
+            if [ "${selected[$i]}" = "1" ]; then
+                mark="[\033[32m✓\033[0m]"
+            else
+                mark="[ ]"
+            fi
+
+            if [ "$i" = "$current" ]; then
+                # 当前项：反色 + 加粗
+                printf '\033[7;1m > %s %s \033[0m\n' "$mark" "${options[$i]}"
+            else
+                printf '   %s %s\n' "$mark" "${options[$i]}"
+            fi
+        done
+
+        printf '\n'
+        printf '\033[2m  ↑/↓ 移动   SPACE 选中/取消   A 全选   Q 取消   Enter 确认\033[0m'
+    }
+
+    # 清屏
+    printf '\033[2J'
+
+    # 主循环
+    while true; do
+        __ms_render
+
+        # 读取按键
+        local key
+        if ! IFS= read -r -s -n1 key 2>/dev/null; then
+            break
+        fi
+
+        case "$key" in
+            $'\x1b')
+                # ESC 序列（方向键 / 其他）
+                local seq=""
+                # 尝试读取后续字节
+                if IFS= read -r -s -n1 -t 0.01 seq 2>/dev/null; then
+                    if [ "$seq" = "[" ] || [ "$seq" = "O" ]; then
+                        local final=""
+                        IFS= read -r -s -n1 -t 0.01 final 2>/dev/null || true
+                        seq="$seq$final"
+                    fi
+                    case "$seq" in
+                        '[A'|'[D'|'OA'|'OD')  # 上/左
+                            ((current--))
+                            [ $current -lt 0 ] && current=$((total-1))
+                            ;;
+                        '[B'|'[C'|'OB'|'OC')  # 下/右
+                            ((current++))
+                            [ $current -ge $total ] && current=0
+                            ;;
+                    esac
+                else
+                    # 单独的 ESC = 取消
+                    selected=()
+                    for ((i=0; i<total; i++)); do selected[$i]=0; done
+                    break
+                fi
+                ;;
+            ' ')
+                # 空格：切换当前项
+                if [ "${selected[$current]}" = "1" ]; then
+                    selected[$current]=0
+                else
+                    selected[$current]=1
+                fi
+                ;;
+            'a'|'A')
+                # a: 全选 / 全不选（toggle）
+                local all_sel=1
+                for ((i=0; i<total; i++)); do
+                    [ "${selected[$i]}" = "0" ] && all_sel=0
+                done
+                for ((i=0; i<total; i++)); do
+                    if [ $all_sel = 1 ]; then
+                        selected[$i]=0
+                    else
+                        selected[$i]=1
+                    fi
+                done
+                ;;
+            'q'|'Q')
+                # q: 取消
+                selected=()
+                for ((i=0; i<total; i++)); do selected[$i]=0; done
+                break
+                ;;
+            'k'|'K')
+                # vim 风格上
+                ((current--))
+                [ $current -lt 0 ] && current=$((total-1))
+                ;;
+            'j'|'J')
+                # vim 风格下
+                ((current++))
+                [ $current -ge $total ] && current=0
+                ;;
+            ''|$'\n'|$'\r')
+                # Enter: 确认
+                break
+                ;;
+        esac
+    done
+
+    __ms_cleanup
+
+    # 输出 RESULT 数组
+    RESULT=()
+    for ((i=0; i<total; i++)); do
+        [ "${selected[$i]}" = "1" ] && RESULT+=("${options[$i]}")
+    done
+}
+
+# 显示某工具的安装路径（用于 select_targets 输出）
+show_install_path() {
+    local tool="$1"
+    case "$tool" in
+        claude-code)
+            printf '  \033[32m✓\033[0m %-12s \033[36m→\033[0m %s\n' \
+                "$tool" "$HOME/.claude/skills/$SKILL_NAME/SKILL.md"
+            ;;
+        cursor)
+            local target="./AGENTS.md"
+            if [ -f "./CLAUDE.md" ] && [ ! -f "./AGENTS.md" ]; then
+                target="./CLAUDE.md"
+            fi
+            local note="(将创建)"
+            [ -f "$target" ] && note="(已存在，将追加)"
+            printf '  \033[32m✓\033[0m %-12s \033[36m→\033[0m %s %s\n' \
+                "$tool" "$target" "$note"
+            ;;
+        aider)
+            printf '  \033[32m✓\033[0m %-12s \033[36m→\033[0m %s %s\n' \
+                "$tool" "./CONVENTIONS.md" "$( [ -f ./CONVENTIONS.md ] && echo '(已存在，将追加)' || echo '(将创建)' )"
+            ;;
+        continue)
+            printf '  \033[32m✓\033[0m %-12s \033[36m→\033[0m %s\n' \
+                "$tool" "$HOME/.continue/config.json"
+            ;;
+        *)
+            printf '  \033[32m✓\033[0m %s\n' "$tool"
+            ;;
+    esac
+}
+
 # 检测所有工具并输出列表
 list_tools() {
     echo "支持的目标："
@@ -276,7 +489,8 @@ list_tools() {
 
 # 交互式选择目标
 select_targets() {
-    local detected=()
+    # 检测已安装的工具
+    local -a detected=()
     for tool in "${ALL_TOOLS[@]}"; do
         local fn="detect_$(TOOL_FN_NAME "$tool")"
         if $fn; then
@@ -287,62 +501,39 @@ select_targets() {
     if [ ${#detected[@]} -eq 0 ]; then
         echo -e "${YELLOW}⚠️  未检测到任何已安装的 AI 工具${NC}"
         echo ""
-        echo "你仍然可以手动安装到特定工具。"
+        echo "可用工具：${ALL_TOOLS[*]}"
         echo ""
-        echo "可用工具："
-        echo "  claude-code  Cursor  aider  continue"
-        echo ""
-        echo "输入工具名安装（如: claude-code cursor），或按 Enter 退出："
-        read -r choice
-        if [ -z "$choice" ]; then
-            exit 0
-        fi
-        # 解析用户输入
-        for t in $choice; do
-            SELECTED+=("$t")
-        done
-        return
+        echo "可以直接用命令行指定：./install.sh claude-code cursor ..."
+        exit 1
     fi
 
-    echo -e "${BOLD}检测到已安装的 AI 工具：${NC}"
+    echo -e "${BOLD}${CYAN}macos-to-linux-compat 安装工具${NC}"
     echo ""
-    local i=1
-    for tool in "${detected[@]}"; do
-        echo -e "  ${GREEN}[$i]${NC} $tool"
-        i=$((i+1))
+
+    # 用 multi-select TUI 让用户选择
+    multi_select "选择要安装到的 AI 工具：" "${detected[@]}"
+    SELECTED=("${RESULT[@]}")
+
+    if [ ${#SELECTED[@]} -eq 0 ]; then
+        echo -e "${YELLOW}未选择任何工具，退出${NC}"
+        exit 0
+    fi
+
+    # 展示每个工具的安装路径
+    echo ""
+    echo -e "${BOLD}将安装到以下位置：${NC}"
+    for tool in "${SELECTED[@]}"; do
+        show_install_path "$tool"
     done
     echo ""
-    echo "选择要安装到的工具（逗号分隔，如 1,2；输入 a 全部；输入 q 退出）："
-    echo "也可以手动输入工具名，如 'claude-code continue'"
-    read -r choice
 
-    case "$choice" in
-        q|Q|"")
-            exit 0
-            ;;
-        a|A|all)
-            SELECTED=("${detected[@]}")
-            ;;
-        *)
-            # 可能是数字列表
-            if [[ "$choice" =~ ^[0-9,]+$ ]]; then
-                SELECTED=()
-                IFS=',' read -ra nums <<< "$choice"
-                for n in "${nums[@]}"; do
-                    local idx=$((n-1))
-                    if [ $idx -ge 0 ] && [ $idx -lt ${#detected[@]} ]; then
-                        SELECTED+=("${detected[$idx]}")
-                    fi
-                done
-            else
-                # 工具名列表
-                SELECTED=()
-                for t in $choice; do
-                    SELECTED+=("$t")
-                done
-            fi
-            ;;
-    esac
+    # 让用户最后确认
+    echo -n "确认安装到以上位置? [Y/n] "
+    read -r ans
+    if [[ "$ans" =~ ^[Nn]$ ]]; then
+        echo -e "${YELLOW}已取消${NC}"
+        exit 0
+    fi
 }
 
 # 执行安装
