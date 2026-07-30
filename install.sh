@@ -323,7 +323,7 @@ multi_select() {
         for ((i=0; i<total; i++)); do
             local mark
             if [ "${selected[$i]}" = "1" ]; then
-                mark="[\033[32m✓\033[0m]"
+                mark=$'[\033[32m✓\033[0m]'
             else
                 mark="[ ]"
             fi
