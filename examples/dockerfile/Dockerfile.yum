@@ -1,0 +1,31 @@
+# 示例：CentOS/RHEL 基础镜像 + Node.js，配置阿里源
+FROM centos:7
+
+# 替换 yum 源为阿里源
+RUN sed -i 's|mirrorlist.centos.org|mirrors.aliyun.com|g; \
+            s|dl.fedoraproject.org|mirrors.aliyun.com|g; \
+            s|^#baseurl=|baseurl=|g; s|^mirrorlist=|#mirrorlist=|g' \
+        /etc/yum.repos.d/*.repo \
+    && yum clean all \
+    && yum makecache \
+    && yum install -y curl ca-certificates \
+    && rm -rf /var/cache/yum/*
+
+# 安装 Node.js
+RUN curl -fsSL https://mirrors.aliyun.com/node-v18.20.4-linux-x64.tar.xz -o node.tar.xz \
+    && tar -xJf node.tar.xz -C /opt/ \
+    && ln -s /opt/node-v18.20.4-linux-x64/bin/node /usr/local/bin/node \
+    && ln -s /opt/node-v18.20.4-linux-x64/bin/npm /usr/local/bin/npm \
+    && rm node.tar.xz
+
+# 替换 npm 源为淘宝源
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm install -g yarn
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production
+
+COPY . .
+
+CMD ["node", "index.js"]
