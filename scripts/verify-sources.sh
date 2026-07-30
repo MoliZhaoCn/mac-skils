@@ -32,7 +32,7 @@ FOUND=0
 # 过滤掉 sed 替换命令行（这些是"被替换"的源，不是"在使用"的源）
 # 匹配: sed -i ..., sed -e ..., 以及 sed 多行续行 (s|...|...|)
 # 同时过滤 yum/apt-get 替换仓库文件配置（这些是在重写源）
-FILTERED_CONTENT=$(grep -v -E '(^|[^a-z])(sed|yum|apt-get|dnf)[[:space:]]|^\s*s\|' "$FILE" 2>/dev/null || cat "$FILE")
+FILTERED_CONTENT=$(grep -v -E '(^|[^a-z])(sed|yum|apt-get|dnf)[[:space:]]|^\s*s\|' "$FILE" 2>/dev/null || true)
 
 for pattern in "${DEFAULT_PATTERNS[@]}"; do
     if echo "$FILTERED_CONTENT" | grep -F "$pattern" > /dev/null 2>&1; then
