@@ -30,7 +30,39 @@ This skill makes AI assistants automatically apply cross-platform-safe rules whe
 
 ## Installation
 
-### Claude Code
+### One-Click Install (recommended)
+
+After cloning the repository, run:
+
+```bash
+./install.sh
+```
+
+The script auto-detects installed AI tools (Claude Code, Cursor, Aider, Continue) and lets you choose which to install to. Just follow the prompts.
+
+Common commands:
+
+```bash
+./install.sh --all                 # Install to all detected tools
+./install.sh claude-code           # Install only to Claude Code
+./install.sh claude-code cursor    # Install to specific tools
+./install.sh --list                # Show detection status
+./install.sh --uninstall           # Remove from all tools
+./install.sh --help                # Full help
+```
+
+Install paths:
+
+- **Claude Code**: `~/.claude/skills/macos-to-linux-compat/SKILL.md`
+- **Cursor**: `./AGENTS.md` (or `./CLAUDE.md` if it already exists)
+- **Aider**: `./CONVENTIONS.md`
+- **Continue**: `~/.continue/config.json` (`customInstructions` merged via `jq`)
+
+### Manual Install
+
+If you prefer manual setup:
+
+**Claude Code:**
 
 ```bash
 mkdir -p ~/.claude/skills/macos-to-linux-compat
@@ -39,7 +71,7 @@ cp SKILL.md ~/.claude/skills/macos-to-linux-compat/SKILL.md
 
 Claude Code auto-loads skills from `~/.claude/skills/`.
 
-### Cursor / Aider / Continue / Other
+**Cursor / Aider / Continue / Other:**
 
 Copy the content of `SKILL.md` into your project's:
 
@@ -71,6 +103,7 @@ Just work as usual — when AI detects macOS environment and you trigger any cro
 ├── SKILL.md                # Main rule document (AI reads this)
 ├── README.md               # English README
 ├── README.zh-CN.md         # Chinese README
+├── install.sh              # One-click installer for AI tools
 ├── scripts/
 │   ├── verify-archive.sh   # Verify tar archive cleanliness
 │   ├── verify-sources.sh   # Verify source URLs replaced
