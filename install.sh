@@ -362,31 +362,48 @@ multi_select() {
         case "$key" in
             $'\x1b')
                 # ESC 序列（方向键 / 其他）
+                # 使用更长的超时，更宽容地接收多字节序列
                 local seq=""
-                # 尝试读取后续字节
-                if IFS= read -r -s -n1 -t 0.01 seq 2>/dev/null; then
-                    if [ "$seq" = "[" ] || [ "$seq" = "O" ]; then
-                        local final=""
-                        IFS= read -r -s -n1 -t 0.01 final 2>/dev/null || true
-                        seq="$seq$final"
+                local b2=""
+                if IFS= read -r -s -n1 -t 0.5 b2 2>/dev/null; then
+                    if [ "$b2" = "[" ] || [ "$b2" = "O" ]; then
+                        # CSI / SS3 序列：吞掉中间字符直到最终字符
+                        # 最多再读 5 个字符，跳过数字/分号参数
+                        local i=0
+                        local ch=""
+                        while [ $i -lt 5 ]; do
+                            if ! IFS= read -r -s -n1 -t 0.3 ch 2>/dev/null; then
+                                break
+                            fi
+                            i=$((i+1))
+                            seq="$seq$ch"
+                            # 如果是字母或 ~ 或 @ 等终止字符，停止
+                            case "$ch" in
+                                [A-Za-z]|[~@]|\$|\^|_|`,`) break ;;
+                            esac
+                        done
+                        seq="$b2$seq"
+                    else
+                        # ESC + 单个其他字符（如 ESC O 然后是其他键）
+                        seq="$b2"
                     fi
+                    # 现在解析完整序列
                     case "$seq" in
-                        '[A'|'[D'|'OA'|'OD')  # 上/左
+                        '[A'|'OA'|'[D'|'OD'|'[5~'|'[H')  # 上 / 左 / PageUp / Home
                             ((current--))
                             [ $current -lt 0 ] && current=$((total-1))
                             ;;
-                        '[B'|'[C'|'OB'|'OC')  # 下/右
+                        '[B'|'OB'|'[C'|'OC'|'[6~'|'[F')  # 下 / 右 / PageDown / End
                             ((current++))
                             [ $current -ge $total ] && current=0
                             ;;
                         *)
-                            # 其他 ESC 序列（Home/End/PageUp/PageDown/F1-F12 等）
-                            # 忽略
+                            # 其他 ESC 序列（Insert/Delete/F1-F12 等）：忽略
                             :
                             ;;
                     esac
                 fi
-                # 单独的 ESC = 忽略（不再清空退出），让用户继续编辑
+                # 单独的 ESC、或无法解析的序列 = 忽略（不退出），让用户继续编辑
                 ;;
             ' ')
                 # 空格：切换当前项
