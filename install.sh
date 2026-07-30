@@ -1,0 +1,501 @@
+#!/usr/bin/env bash
+# install.sh - 一键安装 macos-to-linux-compat skill 到 AI 工具
+#
+# 用法:
+#   ./install.sh                       交互式选择目标工具
+#   ./install.sh --all                 安装到所有检测到的工具
+#   ./install.sh claude-code cursor    安装到指定工具
+#   ./install.sh --uninstall [target]  卸载（target 可省略，默认所有）
+#   ./install.sh --list                列出所有支持的目标
+#   ./install.sh --help                显示帮助
+#
+# 支持的工具:
+#   claude-code   Claude Code (复制 SKILL.md 到 ~/.claude/skills/)
+#   cursor        Cursor IDE (追加到 ./AGENTS.md 或 ./CLAUDE.md)
+#   aider         Aider CLI (追加到 ./CONVENTIONS.md)
+#   continue      Continue (VS Code) (合并到 ~/.continue/config.json)
+
+set -e
+
+# ============ 路径常量 ============
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_FILE="$SCRIPT_DIR/SKILL.md"
+SKILL_NAME="macos-to-linux-compat"
+MARKER_START="<!-- macos-to-linux-compat:start -->"
+MARKER_END="<!-- macos-to-linux-compat:end -->"
+
+# ============ 颜色（如果终端支持）============
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; BOLD=''; NC=''
+fi
+
+# ============ 检测函数 ============
+
+# 每个工具的检测返回 0（已安装）或 1（未安装）
+detect_claude_code() {
+    # Claude Code 检测：~/.claude/ 目录存在，或 claude 命令可用
+    [ -d "$HOME/.claude" ] && return 0
+    command -v claude >/dev/null 2>&1 && return 0
+    return 1
+}
+
+detect_cursor() {
+    # Cursor 检测：~/.cursor/ 或 cursor 命令
+    [ -d "$HOME/.cursor" ] && return 0
+    [ -d "$HOME/.config/Cursor" ] && return 0
+    command -v cursor >/dev/null 2>&1 && return 0
+    return 1
+}
+
+detect_aider() {
+    # Aider 检测：aider 命令
+    command -v aider >/dev/null 2>&1 && return 0
+    return 1
+}
+
+detect_continue() {
+    # Continue 检测：~/.continue/ 目录
+    [ -d "$HOME/.continue" ] && return 0
+    return 1
+}
+
+# 工具名映射：外部名 (命令行/显示) -> 内部函数名
+# 因为 bash 函数名不允许连字符
+TOOL_FN_NAME() {
+    case "$1" in
+        claude-code) echo "claude_code" ;;
+        cursor)      echo "cursor" ;;
+        aider)       echo "aider" ;;
+        continue)    echo "continue" ;;
+        *)           echo "$1" ;;
+    esac
+}
+
+# 列出所有支持的工具名（按固定顺序）
+ALL_TOOLS=(claude-code cursor aider continue)
+
+# ============ 安装函数 ============
+
+# Claude Code: 复制 SKILL.md 到 skills 目录
+install_claude_code() {
+    local target_dir="$HOME/.claude/skills/$SKILL_NAME"
+    local target_file="$target_dir/SKILL.md"
+
+    mkdir -p "$target_dir"
+
+    if [ -f "$target_file" ]; then
+        # 已存在：询问是否覆盖
+        echo -e "${YELLOW}⚠️  目标文件已存在: $target_file${NC}"
+        echo -n "覆盖? [y/N] "
+        read -r ans
+        if [[ ! "$ans" =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}跳过 Claude Code${NC}"
+            return 0
+        fi
+    fi
+
+    cp "$SKILL_FILE" "$target_file"
+    echo -e "${GREEN}✅ Claude Code: $target_file${NC}"
+}
+
+# Cursor: 追加 SKILL 内容到 ./AGENTS.md（如果存在）或 ./CLAUDE.md
+install_cursor() {
+    local target=""
+    if [ -f "./AGENTS.md" ]; then
+        target="./AGENTS.md"
+    elif [ -f "./CLAUDE.md" ]; then
+        target="./CLAUDE.md"
+    else
+        target="./AGENTS.md"  # 默认创建 AGENTS.md
+    fi
+
+    append_to_file "$target" "Cursor"
+}
+
+# Aider: 追加 SKILL 内容到 ./CONVENTIONS.md
+install_aider() {
+    append_to_file "./CONVENTIONS.md" "Aider"
+}
+
+# Continue: 合并 customInstructions 到 ~/.continue/config.json
+install_continue() {
+    local config_file="$HOME/.continue/config.json"
+    mkdir -p "$(dirname "$config_file")"
+
+    # 读取 SKILL.md 内容（去掉 frontmatter，因为 Continue 不需要）
+    local skill_content
+    skill_content=$(awk '/^---$/{c++; next} c>=2{print}' "$SKILL_FILE")
+
+    if [ -f "$config_file" ]; then
+        # 已存在：合并 customInstructions
+        if command -v jq >/dev/null 2>&1; then
+            local new_content
+            new_content=$(jq --arg ci "$skill_content" '.customInstructions = ($ci)' "$config_file")
+            echo "$new_content" > "$config_file"
+            echo -e "${GREEN}✅ Continue: 已更新 $config_file 的 customInstructions${NC}"
+        else
+            echo -e "${YELLOW}⚠️  需要 jq 来合并 JSON。请安装 jq 后重试，或手动编辑 $config_file${NC}"
+            return 1
+        fi
+    else
+        # 不存在：创建新文件
+        cat > "$config_file" <<EOF
+{
+  "customInstructions": $(printf '%s' "$skill_content" | jq -Rs .)
+}
+EOF
+        echo -e "${GREEN}✅ Continue: 已创建 $config_file${NC}"
+    fi
+}
+
+# 通用：追加到文件（带标记，用于 Cursor/Aider）
+# 用法: append_to_file <path> <tool-name>
+append_to_file() {
+    local target="$1"
+    local tool_name="$2"
+
+    # 如果文件已包含 marker，认为已经安装过
+    if [ -f "$target" ] && grep -q "$MARKER_START" "$target" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  $tool_name: $target 已包含此 skill${NC}"
+        echo -n "替换已存在的内容? [y/N] "
+        read -r ans
+        if [[ ! "$ans" =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}跳过 $tool_name${NC}"
+            return 0
+        fi
+        # 删除旧内容（marker 之间的）
+        sed -i.bak "/$MARKER_START/,/$MARKER_END/d" "$target"
+        rm -f "$target.bak"
+    fi
+
+    # 追加新内容（带 marker）
+    {
+        echo ""
+        echo "$MARKER_START"
+        cat "$SKILL_FILE"
+        echo "$MARKER_END"
+    } >> "$target"
+
+    echo -e "${GREEN}✅ $tool_name: 已追加到 $target${NC}"
+}
+
+# ============ 卸载函数 ============
+
+uninstall_claude_code() {
+    local target_dir="$HOME/.claude/skills/$SKILL_NAME"
+    if [ -d "$target_dir" ]; then
+        rm -rf "$target_dir"
+        echo -e "${GREEN}✅ Claude Code: 已删除 $target_dir${NC}"
+    else
+        echo -e "${BLUE}ℹ️  Claude Code 未安装${NC}"
+    fi
+}
+
+uninstall_cursor() {
+    remove_markers "./AGENTS.md" "Cursor"
+    remove_markers "./CLAUDE.md" "Cursor"
+}
+
+uninstall_aider() {
+    remove_markers "./CONVENTIONS.md" "Aider"
+}
+
+uninstall_continue() {
+    local config_file="$HOME/.continue/config.json"
+    if [ ! -f "$config_file" ]; then
+        echo -e "${BLUE}ℹ️  Continue 未安装${NC}"
+        return 0
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        local updated
+        updated=$(jq 'del(.customInstructions)' "$config_file")
+        echo "$updated" > "$config_file"
+        echo -e "${GREEN}✅ Continue: 已从 $config_file 移除 customInstructions${NC}"
+    else
+        echo -e "${YELLOW}⚠️  需要 jq 来编辑 JSON。请手动从 $config_file 移除 customInstructions${NC}"
+    fi
+}
+
+# 通用：删除文件中的 marker 段
+remove_markers() {
+    local target="$1"
+    local tool_name="$2"
+
+    if [ ! -f "$target" ]; then
+        return 0
+    fi
+
+    if ! grep -q "$MARKER_START" "$target" 2>/dev/null; then
+        echo -e "${BLUE}ℹ️  $tool_name: $target 未包含此 skill${NC}"
+        return 0
+    fi
+
+    sed -i.bak "/$MARKER_START/,/$MARKER_END/d" "$target"
+    rm -f "$target.bak"
+
+    # 如果文件变成空白，删除
+    if [ ! -s "$target" ]; then
+        rm -f "$target"
+        echo -e "${GREEN}✅ $tool_name: 已删除空文件 $target${NC}"
+    else
+        echo -e "${GREEN}✅ $tool_name: 已从 $target 移除 skill 段${NC}"
+    fi
+}
+
+# ============ 辅助函数 ============
+
+# 检测所有工具并输出列表
+list_tools() {
+    echo "支持的目标："
+    echo ""
+    for tool in "${ALL_TOOLS[@]}"; do
+        local fn="detect_$(TOOL_FN_NAME "$tool")"
+        if $fn; then
+            echo -e "  ${GREEN}✓${NC} $tool  ${CYAN}(已检测到)${NC}"
+        else
+            echo -e "  ${RED}✗${NC} $tool  ${BLUE}(未检测到)${NC}"
+        fi
+    done
+    echo ""
+    echo "检测方式："
+    echo "  claude-code: ~/.claude/ 目录或 claude 命令"
+    echo "  cursor:      ~/.cursor/ 目录或 cursor 命令"
+    echo "  aider:       aider 命令"
+    echo "  continue:    ~/.continue/ 目录"
+}
+
+# 交互式选择目标
+select_targets() {
+    local detected=()
+    for tool in "${ALL_TOOLS[@]}"; do
+        local fn="detect_$(TOOL_FN_NAME "$tool")"
+        if $fn; then
+            detected+=("$tool")
+        fi
+    done
+
+    if [ ${#detected[@]} -eq 0 ]; then
+        echo -e "${YELLOW}⚠️  未检测到任何已安装的 AI 工具${NC}"
+        echo ""
+        echo "你仍然可以手动安装到特定工具。"
+        echo ""
+        echo "可用工具："
+        echo "  claude-code  Cursor  aider  continue"
+        echo ""
+        echo "输入工具名安装（如: claude-code cursor），或按 Enter 退出："
+        read -r choice
+        if [ -z "$choice" ]; then
+            exit 0
+        fi
+        # 解析用户输入
+        for t in $choice; do
+            SELECTED+=("$t")
+        done
+        return
+    fi
+
+    echo -e "${BOLD}检测到已安装的 AI 工具：${NC}"
+    echo ""
+    local i=1
+    for tool in "${detected[@]}"; do
+        echo -e "  ${GREEN}[$i]${NC} $tool"
+        i=$((i+1))
+    done
+    echo ""
+    echo "选择要安装到的工具（逗号分隔，如 1,2；输入 a 全部；输入 q 退出）："
+    echo "也可以手动输入工具名，如 'claude-code continue'"
+    read -r choice
+
+    case "$choice" in
+        q|Q|"")
+            exit 0
+            ;;
+        a|A|all)
+            SELECTED=("${detected[@]}")
+            ;;
+        *)
+            # 可能是数字列表
+            if [[ "$choice" =~ ^[0-9,]+$ ]]; then
+                SELECTED=()
+                IFS=',' read -ra nums <<< "$choice"
+                for n in "${nums[@]}"; do
+                    local idx=$((n-1))
+                    if [ $idx -ge 0 ] && [ $idx -lt ${#detected[@]} ]; then
+                        SELECTED+=("${detected[$idx]}")
+                    fi
+                done
+            else
+                # 工具名列表
+                SELECTED=()
+                for t in $choice; do
+                    SELECTED+=("$t")
+                done
+            fi
+            ;;
+    esac
+}
+
+# 执行安装
+do_install() {
+    if [ ${#SELECTED[@]} -eq 0 ]; then
+        echo -e "${YELLOW}未选择任何工具${NC}"
+        exit 0
+    fi
+
+    echo ""
+    echo -e "${BOLD}开始安装到: ${SELECTED[*]}${NC}"
+    echo ""
+
+    local errors=0
+    for tool in "${SELECTED[@]}"; do
+        local fn="install_$(TOOL_FN_NAME "$tool")"
+        if type "$fn" >/dev/null 2>&1; then
+            if ! "$fn"; then
+                errors=$((errors+1))
+            fi
+        else
+            echo -e "${RED}❌ 未知工具: $tool${NC}"
+            errors=$((errors+1))
+        fi
+    done
+
+    echo ""
+    if [ $errors -eq 0 ]; then
+        echo -e "${GREEN}${BOLD}🎉 安装完成！${NC}"
+    else
+        echo -e "${YELLOW}⚠️  安装完成，但有 $errors 个错误${NC}"
+    fi
+}
+
+# 执行卸载
+do_uninstall() {
+    local targets=("$@")
+    if [ ${#targets[@]} -eq 0 ]; then
+        # 尝试所有
+        targets=("${ALL_TOOLS[@]}")
+    fi
+
+    echo ""
+    echo -e "${BOLD}开始卸载: ${targets[*]}${NC}"
+    echo ""
+
+    for tool in "${targets[@]}"; do
+        local fn="uninstall_$(TOOL_FN_NAME "$tool")"
+        if type "$fn" >/dev/null 2>&1; then
+            "$fn"
+        else
+            echo -e "${RED}❌ 未知工具: $tool${NC}"
+        fi
+    done
+
+    echo ""
+    echo -e "${GREEN}${BOLD}✅ 卸载完成${NC}"
+}
+
+# 打印帮助
+print_help() {
+    cat <<EOF
+${BOLD}macos-to-linux-compat 安装工具${NC}
+
+${BOLD}用法:${NC}
+  ./install.sh                       交互式选择目标工具
+  ./install.sh --all                 安装到所有检测到的工具
+  ./install.sh claude-code cursor    安装到指定工具（空格分隔）
+  ./install.sh --uninstall [target]  卸载（target 可省略，默认所有）
+  ./install.sh --list                列出所有支持的目标及检测状态
+  ./install.sh --help                显示此帮助
+
+${BOLD}支持的工具:${NC}
+  claude-code   Claude Code
+                → 复制到 ~/.claude/skills/macos-to-linux-compat/SKILL.md
+
+  cursor        Cursor IDE
+                → 追加到 ./AGENTS.md 或 ./CLAUDE.md
+
+  aider         Aider CLI
+                → 追加到 ./CONVENTIONS.md
+
+  continue      Continue (VS Code)
+                → 合并到 ~/.continue/config.json (customInstructions)
+
+${BOLD}示例:${NC}
+  ./install.sh --all                  # 安装到所有检测到的工具
+  ./install.sh claude-code            # 仅安装到 Claude Code
+  ./install.sh claude-code cursor     # 安装到 Claude Code 和 Cursor
+  ./install.sh --uninstall claude-code  # 卸载 Claude Code 安装
+  ./install.sh --uninstall            # 卸载所有
+
+${BOLD}要求:${NC}
+  - bash 4+
+  - SKILL.md 必须存在于脚本同目录
+  - Continue 安装需要 jq（https://stedolan.github.io/jq/）
+EOF
+}
+
+# ============ 主流程 ============
+
+main() {
+    # 检查 SKILL.md 存在
+    if [ ! -f "$SKILL_FILE" ]; then
+        echo -e "${RED}❌ 找不到 SKILL.md: $SKILL_FILE${NC}" >&2
+        exit 1
+    fi
+
+    SELECTED=()
+
+    # 解析参数
+    case "${1:-}" in
+        --help|-h|"")
+            if [ -z "${1:-}" ]; then
+                echo -e "${BOLD}${CYAN}macos-to-linux-compat 安装工具${NC}${NC}"
+                echo ""
+                select_targets
+                do_install
+            else
+                print_help
+            fi
+            ;;
+        --list|-l)
+            list_tools
+            ;;
+        --all|-a)
+            echo -e "${BOLD}${CYAN}macos-to-linux-compat 安装工具${NC}${NC}"
+            echo ""
+            SELECTED=()
+            for tool in "${ALL_TOOLS[@]}"; do
+                local fn="detect_$(TOOL_FN_NAME "$tool")"
+                if $fn; then
+                    SELECTED+=("$tool")
+                    echo -e "${GREEN}✓${NC} 检测到: $tool"
+                fi
+            done
+            echo ""
+            if [ ${#SELECTED[@]} -eq 0 ]; then
+                echo -e "${YELLOW}未检测到任何工具${NC}"
+                exit 1
+            fi
+            do_install
+            ;;
+        --uninstall|-u)
+            shift
+            do_uninstall "$@"
+            ;;
+        *)
+            # 工具名列表
+            SELECTED=("$@")
+            do_install
+            ;;
+    esac
+}
+
+main "$@"
