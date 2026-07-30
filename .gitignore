@@ -1,0 +1,17 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SDD workspace (not for commit)
+.superpowers/sdd/
+
+# Test artifacts
+archive.tar.gz
+*.tar.gz
+!examples/**/*.tar.gz
