@@ -21,10 +21,10 @@ RUN npm run build
 # ========== 构建阶段 2：后端 ==========
 FROM golang:1.22-bookworm AS backend
 
-# 替换 apt 源为清华源
+# 替换 apt 源为清华源（兼容 .list 和 deb822 .sources 格式）
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; \
             s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
-        /etc/apt/sources.list.d/*.list /etc/apt/sources.list 2>/dev/null || true \
+        /etc/apt/sources.list.d/*.list /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
     && apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -41,9 +41,10 @@ RUN CGO_ENABLED=0 go build -o /api-server .
 # ========== 运行阶段 ==========
 FROM debian:bookworm-slim
 
+# 替换 apt 源为清华源（兼容 .list 和 deb822 .sources 格式）
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; \
             s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
-        /etc/apt/sources.list.d/*.list /etc/apt/sources.list 2>/dev/null || true \
+        /etc/apt/sources.list.d/*.list /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
     && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
