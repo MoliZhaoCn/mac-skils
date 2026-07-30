@@ -344,12 +344,18 @@ multi_select() {
     printf '\033[2J'
 
     # 主循环
+    # 注意：任何按键都不会意外退出循环，只有 Enter 才确认。
+    # ESC、未识别键、功能键等都安全忽略。
+    # read 失败（EOF/Ctrl-D）= 用户取消，退出循环（清空选择）。
     while true; do
         __ms_render
 
         # 读取按键
         local key
         if ! IFS= read -r -s -n1 key 2>/dev/null; then
+            # EOF / Ctrl-D：视为用户取消
+            selected=()
+            for ((i=0; i<total; i++)); do selected[$i]=0; done
             break
         fi
 
@@ -373,13 +379,14 @@ multi_select() {
                             ((current++))
                             [ $current -ge $total ] && current=0
                             ;;
+                        *)
+                            # 其他 ESC 序列（Home/End/PageUp/PageDown/F1-F12 等）
+                            # 忽略
+                            :
+                            ;;
                     esac
-                else
-                    # 单独的 ESC = 取消
-                    selected=()
-                    for ((i=0; i<total; i++)); do selected[$i]=0; done
-                    break
                 fi
+                # 单独的 ESC = 忽略（不再清空退出），让用户继续编辑
                 ;;
             ' ')
                 # 空格：切换当前项
@@ -404,10 +411,9 @@ multi_select() {
                 done
                 ;;
             'q'|'Q')
-                # q: 取消
+                # q: 清空所有选择但不退出循环，让用户可以重新选
                 selected=()
                 for ((i=0; i<total; i++)); do selected[$i]=0; done
-                break
                 ;;
             'k'|'K')
                 # vim 风格上
@@ -420,8 +426,12 @@ multi_select() {
                 [ $current -ge $total ] && current=0
                 ;;
             ''|$'\n'|$'\r')
-                # Enter: 确认
+                # Enter: 确认，退出循环
                 break
+                ;;
+            *)
+                # 未识别的按键：忽略，不退出
+                :
                 ;;
         esac
     done
