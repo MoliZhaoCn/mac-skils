@@ -18,7 +18,7 @@
 - Linux 解压时建议加 `--no-same-owner`
 - `apt` / `yum` / `dnf` / `apk` / `pip` / `npm` / `go` / `cargo` / `composer` 配置国内源
 - 覆盖 `Dockerfile`、`docker-compose`、GitHub Actions、GitLab CI、Jenkinsfile
-- Docker Compose 安全规则：bind mount 持久化（不用命名 volume）、端口绑定 127.0.0.1
+- Docker Compose：生成时 AI 会先询问持久化方式（bind mount / 命名 volume / 临时卷）和端口暴露方式（127.0.0.1 / 0.0.0.0 / 反向代理），推荐方案作默认
 
 ## 功能特性
 
@@ -27,7 +27,7 @@
 - ✅ `apt` / `yum` / `dnf` / `apk` 国内源：清华源 / 阿里源
 - ✅ `pip` / `npm` / `go` / `cargo` / `composer` 国内源
 - ✅ Docker / CI / CD 配置感知
-- ✅ **Docker Compose**：所有持久化用 bind mount、端口绑定 127.0.0.1
+- ✅ **Docker Compose**：生成前询问持久化和端口方案（提供推荐项作为默认）
 - ✅ 附带独立的验证脚本
 
 ## 安装
