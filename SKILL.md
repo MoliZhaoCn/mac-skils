@@ -156,6 +156,97 @@ RUN npm config set registry https://registry.npmmirror.com
   run: npm config set registry https://registry.npmmirror.com
 ```
 
+## Docker Compose 安全规则
+
+生成 `docker-compose*.yml` 时，必须遵守以下两条规则。
+
+### 规则 1：持久化与挂载全部使用 bind mount
+
+**禁止使用命名 volume。** 所有需要持久化或共享的目录（包括数据库数据目录、上传目录、日志目录、配置文件目录），一律用 bind mount 映射到主机的 `./<dir>` 路径。
+
+理由：bind mount 让数据直接位于主机文件系统，备份、迁移、调试都更简单；避免 Docker volume 的"看不见摸不着"问题。
+
+**反例（禁止）：**
+
+```yaml
+services:
+  db:
+    volumes:
+      - db_data:/var/lib/postgresql/data   # ❌ 命名 volume
+volumes:
+  db_data:                                 # ❌ 不应在顶层声明 volume
+```
+
+**正例（必须）：**
+
+```yaml
+services:
+  db:
+    volumes:
+      - ./data/db:/var/lib/postgresql/data  # ✅ bind mount 到主机 ./data/db
+```
+
+容器内部的目录（`/var/lib/postgresql/data` 等）必须用 Docker 镜像官方文档中指定的路径。
+
+### 规则 2：端口绑定到 127.0.0.1
+
+**禁止使用 `0.0.0.0` 或省略 host（默认就是 `0.0.0.0`）。** 端口映射必须显式绑定到 `127.0.0.1`。
+
+理由：避免容器端口意外暴露到生产服务器，被公网直接访问。即使是开发环境，也减少被扫描攻击的风险。
+
+**反例（禁止）：**
+
+```yaml
+ports:
+  - "5432:5432"           # ❌ 等价于 0.0.0.0:5432
+  - "0.0.0.0:8080:80"     # ❌ 直接暴露到所有网卡
+```
+
+**正例（必须）：**
+
+```yaml
+ports:
+  - "127.0.0.1:8080:80"   # ✅ 仅本机可访问
+  - "127.0.0.1:5432:5432" # ✅ 数据库端口也仅本机
+```
+
+### 需要外部访问时的切换
+
+如果确实需要让外部访问（例如部署后通过反向代理对外提供服务）：
+
+1. 在反向代理（Nginx / Caddy / Traefik）层监听 `0.0.0.0`
+2. 反向代理内部 upstream 仍指向 `127.0.0.1:容器端口`
+3. 容器端口本身保持 `127.0.0.1` 绑定，不直接对外
+
+这样既能用 80/443 对外，又避免容器层被穿透。
+
+### 完整示例
+
+```yaml
+services:
+  web:
+    image: myapp:latest
+    ports:
+      - "127.0.0.1:8080:80"           # ✅ 本机访问
+    volumes:
+      - ./app:/app                     # ✅ 代码 bind mount
+      - ./logs/web:/app/logs           # ✅ 日志 bind mount
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    ports:
+      - "127.0.0.1:5432:5432"         # ✅ 数据库也仅本机
+    volumes:
+      - ./data/db:/var/lib/postgresql/data  # ✅ 数据 bind mount
+      - ./config/postgres:/etc/postgresql/conf.d:ro  # ✅ 配置只读
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+```
+
+**禁止在文件顶层声明 `volumes:` 块。**
+
 ## 验证清单
 
 生成产物后执行下列命令验证：
