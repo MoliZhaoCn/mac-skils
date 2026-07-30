@@ -63,11 +63,11 @@ sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 
 | 服务 | 默认 | 国内 |
 |---|---|---|
-| Docker Hub | docker.io | mirror.baidubce.com |
+| Docker Hub | docker.io | docker.1ms.run |
 
 ```bash
 # /etc/docker/daemon.json
 {
-  "registry-mirrors": ["https://mirror.baidubce.com"]
+  "registry-mirrors": ["https://docker.1ms.run"]
 }
 ```
