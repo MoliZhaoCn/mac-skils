@@ -156,96 +156,81 @@ RUN npm config set registry https://registry.npmmirror.com
   run: npm config set registry https://registry.npmmirror.com
 ```
 
-## Docker Compose 安全规则
+## Docker Compose 询问规则
 
-生成 `docker-compose*.yml` 时，必须遵守以下两条规则。
+生成 `docker-compose*.yml` 时，**不要假设用户的偏好**，而是先询问用户两个关键选择。每个选择都要列出几种常见方案 + 推荐项，让用户拍板。
 
-### 规则 1：持久化与挂载全部使用 bind mount
+### 询问 1：持久化方式
 
-**禁止使用命名 volume。** 所有需要持久化或共享的目录（包括数据库数据目录、上传目录、日志目录、配置文件目录），一律用 bind mount 映射到主机的 `./<dir>` 路径。
+生成涉及持久化的 docker-compose 时，**先用 AskUserQuestion 询问**，提供以下方案：
 
-理由：bind mount 让数据直接位于主机文件系统，备份、迁移、调试都更简单；避免 Docker volume 的"看不见摸不着"问题。
+| 方案 | 适用场景 |
+|---|---|
+| **A. bind mount（推荐）** | 数据直接放在主机 `./` 目录，备份、迁移、调试最简单 |
+| **B. 命名 volume** | Docker 管理（路径在 `/var/lib/docker/volumes/`），适合 Docker Swarm 等编排场景 |
+| **C. 临时卷（`:ro` 或 tmpfs）** | 容器删除时数据一起清理，适合纯缓存/中间数据 |
+| **D. 让我描述** | 用户想自己指定路径或方式 |
 
-**反例（禁止）：**
+如果用户选 A（bind mount），bind 到 `./<服务名>/<数据类型>` 这类约定路径（如 `./data/db`）。
 
-```yaml
-services:
-  db:
-    volumes:
-      - db_data:/var/lib/postgresql/data   # ❌ 命名 volume
-volumes:
-  db_data:                                 # ❌ 不应在顶层声明 volume
+如果用户选 B（命名 volume），必须在文件顶层声明 `volumes: db_data:` 块。
+
+如果用户已经明确说过偏好（如"用 bind mount"），可以不再问。
+
+### 询问 2：端口暴露方式
+
+生成 `ports:` 时，**先用 AskUserQuestion 询问**，提供以下方案：
+
+| 方案 | 适用场景 |
+|---|---|
+| **A. 127.0.0.1（推荐）** | 仅本机访问，部署到生产服务器时最安全 |
+| **B. 0.0.0.0** | 所有网卡可访问，需要防火墙保护，仅在用户明确要求时使用 |
+| **C. 反向代理** | 容器端口用 127.0.0.1，由 Nginx/Caddy/Traefik 等对外监听 0.0.0.0 |
+| **D. 让我描述** | 用户想自己指定 |
+
+如果用户选 A，端口写成 `"127.0.0.1:8080:80"`。
+
+如果用户选 B，端口写成 `"0.0.0.0:8080:80"` 或裸端口 `"8080:80"`（后者等价）。
+
+如果用户选 C，生成两个服务：原服务绑 127.0.0.1，加上 Nginx/Caddy/Traefik 服务绑 0.0.0.0。
+
+### 询问时的输出格式
+
+```
+Question: docker-compose 的持久化用哪种方式？
+Header: 持久化方式
+Options:
+  - label: "bind mount (推荐)"
+    description: "数据放主机 ./data/db 目录，便于备份迁移"
+  - label: "命名 volume"
+    description: "Docker 自动管理（路径在 /var/lib/docker/...）"
+  - label: "临时卷"
+    description: "容器删除时数据一起清理"
+multiSelect: false
+
+Question: docker-compose 的端口怎么暴露？
+Header: 端口方式
+Options:
+  - label: "127.0.0.1 (推荐)"
+    description: "仅本机访问，最安全"
+  - label: "0.0.0.0"
+    description: "所有网卡可访问，需要自己保证安全"
+  - label: "反向代理"
+    description: "容器绑 127.0.0.1，由 Nginx/Caddy 对外"
+multiSelect: false
 ```
 
-**正例（必须）：**
+### 何时可以跳过询问
 
-```yaml
-services:
-  db:
-    volumes:
-      - ./data/db:/var/lib/postgresql/data  # ✅ bind mount 到主机 ./data/db
-```
+- 用户已经在前文明确指定了偏好（如"用 bind mount + 127.0.0.1"）
+- 用户明确说"按你推荐的来"或"不要问了"
+- 修复现有 docker-compose 文件（不是新建）
 
-容器内部的目录（`/var/lib/postgresql/data` 等）必须用 Docker 镜像官方文档中指定的路径。
+### 默认行为（用户授权后）
 
-### 规则 2：端口绑定到 127.0.0.1
-
-**禁止使用 `0.0.0.0` 或省略 host（默认就是 `0.0.0.0`）。** 端口映射必须显式绑定到 `127.0.0.1`。
-
-理由：避免容器端口意外暴露到生产服务器，被公网直接访问。即使是开发环境，也减少被扫描攻击的风险。
-
-**反例（禁止）：**
-
-```yaml
-ports:
-  - "5432:5432"           # ❌ 等价于 0.0.0.0:5432
-  - "0.0.0.0:8080:80"     # ❌ 直接暴露到所有网卡
-```
-
-**正例（必须）：**
-
-```yaml
-ports:
-  - "127.0.0.1:8080:80"   # ✅ 仅本机可访问
-  - "127.0.0.1:5432:5432" # ✅ 数据库端口也仅本机
-```
-
-### 需要外部访问时的切换
-
-如果确实需要让外部访问（例如部署后通过反向代理对外提供服务）：
-
-1. 在反向代理（Nginx / Caddy / Traefik）层监听 `0.0.0.0`
-2. 反向代理内部 upstream 仍指向 `127.0.0.1:容器端口`
-3. 容器端口本身保持 `127.0.0.1` 绑定，不直接对外
-
-这样既能用 80/443 对外，又避免容器层被穿透。
-
-### 完整示例
-
-```yaml
-services:
-  web:
-    image: myapp:latest
-    ports:
-      - "127.0.0.1:8080:80"           # ✅ 本机访问
-    volumes:
-      - ./app:/app                     # ✅ 代码 bind mount
-      - ./logs/web:/app/logs           # ✅ 日志 bind mount
-    depends_on:
-      - db
-
-  db:
-    image: postgres:16
-    ports:
-      - "127.0.0.1:5432:5432"         # ✅ 数据库也仅本机
-    volumes:
-      - ./data/db:/var/lib/postgresql/data  # ✅ 数据 bind mount
-      - ./config/postgres:/etc/postgresql/conf.d:ro  # ✅ 配置只读
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-```
-
-**禁止在文件顶层声明 `volumes:` 块。**
+如果用户回答"用推荐的"或类似：
+- 持久化：bind mount
+- 端口：127.0.0.1
 
 ## 验证清单
 

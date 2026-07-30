@@ -1,18 +1,20 @@
-# 示例：Docker Compose 部署配置
-# 演示两条安全规则：
-#   1. 所有持久化用 bind mount（不用命名 volume）
-#   2. 端口全部绑定到 127.0.0.1（不直接暴露到公网）
+# 示例：Docker Compose 部署配置（采用 SKILL.md 中的推荐方案）
+#
+# 实际生成 docker-compose 时，AI 应该先询问用户两个选择：
+#   1. 持久化方式：bind mount（推荐）/ 命名 volume / 临时卷
+#   2. 端口暴露方式：127.0.0.1（推荐）/ 0.0.0.0 / 反向代理
+# 用户选定后再生成。下面展示的是用户选了"推荐方案"的产出。
 
 services:
   # ============ Web 应用 ============
   web:
     image: myapp:latest
     ports:
-      - "127.0.0.1:8080:80"           # ✅ 仅本机访问
+      - "127.0.0.1:8080:80"           # 用户选了 127.0.0.1（推荐）
     volumes:
-      - ./app:/app                     # ✅ 应用代码 bind mount
-      - ./logs/web:/app/logs           # ✅ 日志 bind mount
-      - ./config/web:/etc/myapp:ro     # ✅ 配置 bind mount（只读）
+      - ./app:/app                     # 用户选了 bind mount（推荐）
+      - ./logs/web:/app/logs
+      - ./config/web:/etc/myapp:ro
     environment:
       DATABASE_URL: postgres://db:5432/myapp
     depends_on:
@@ -23,11 +25,11 @@ services:
   db:
     image: postgres:16
     ports:
-      - "127.0.0.1:5432:5432"         # ✅ 数据库也仅本机
+      - "127.0.0.1:5432:5432"
     volumes:
-      - ./data/db:/var/lib/postgresql/data  # ✅ 数据 bind mount
-      - ./config/postgres:/etc/postgresql/conf.d:ro  # ✅ 配置 bind mount
-      - ./logs/db:/var/log/postgresql  # ✅ 日志 bind mount
+      - ./data/db:/var/lib/postgresql/data
+      - ./config/postgres:/etc/postgresql/conf.d:ro
+      - ./logs/db:/var/log/postgresql
     environment:
       POSTGRES_DB: myapp
       POSTGRES_USER: ${DB_USER:-myapp}
@@ -38,14 +40,15 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:6379:6379"         # ✅ Redis 也仅本机
+      - "127.0.0.1:6379:6379"
     volumes:
-      - ./data/redis:/data            # ✅ Redis 数据 bind mount
-      - ./config/redis:/usr/local/etc/redis:ro  # ✅ 配置 bind mount
+      - ./data/redis:/data
+      - ./config/redis:/usr/local/etc/redis:ro
     command: redis-server /usr/local/etc/redis/redis.conf
     restart: unless-stopped
 
-# 注意：文件顶层不声明 volumes: 块（避免命名 volume）
+# 注意：本示例采用 bind mount 推荐方案，不声明顶层 volumes: 块。
+# 如果用户选了"命名 volume"，则需要在这里加 volumes: 块声明。
 
 # .env 文件（应该被 .gitignore 排除）：
 # DB_USER=myapp
