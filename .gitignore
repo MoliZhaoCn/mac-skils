@@ -14,6 +14,9 @@ Thumbs.db
 # SDD workspace (not for commit)
 .superpowers/sdd/
 
+# Design docs and plans (development process artifacts)
+docs/
+
 # Test artifacts
 archive.tar.gz
 *.tar.gz
