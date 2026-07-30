@@ -1,0 +1,20 @@
+# 示例：Debian/Ubuntu 基础镜像 + Python，配置清华源
+FROM python:3.11-slim-bookworm
+
+# 替换 apt 源为清华源
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; \
+            s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
+        /etc/apt/sources.list.d/*.list /etc/apt/sources.list 2>/dev/null || true \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 替换 pip 源为清华源
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    && pip install --no-cache-dir flask gunicorn
+
+WORKDIR /app
+COPY . .
+
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "app:app"]
