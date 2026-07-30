@@ -1,0 +1,52 @@
+# 示例：Docker Compose 部署配置
+# 演示两条安全规则：
+#   1. 所有持久化用 bind mount（不用命名 volume）
+#   2. 端口全部绑定到 127.0.0.1（不直接暴露到公网）
+
+services:
+  # ============ Web 应用 ============
+  web:
+    image: myapp:latest
+    ports:
+      - "127.0.0.1:8080:80"           # ✅ 仅本机访问
+    volumes:
+      - ./app:/app                     # ✅ 应用代码 bind mount
+      - ./logs/web:/app/logs           # ✅ 日志 bind mount
+      - ./config/web:/etc/myapp:ro     # ✅ 配置 bind mount（只读）
+    environment:
+      DATABASE_URL: postgres://db:5432/myapp
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ============ Postgres 数据库 ============
+  db:
+    image: postgres:16
+    ports:
+      - "127.0.0.1:5432:5432"         # ✅ 数据库也仅本机
+    volumes:
+      - ./data/db:/var/lib/postgresql/data  # ✅ 数据 bind mount
+      - ./config/postgres:/etc/postgresql/conf.d:ro  # ✅ 配置 bind mount
+      - ./logs/db:/var/log/postgresql  # ✅ 日志 bind mount
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: ${DB_USER:-myapp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    restart: unless-stopped
+
+  # ============ Redis 缓存 ============
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"         # ✅ Redis 也仅本机
+    volumes:
+      - ./data/redis:/data            # ✅ Redis 数据 bind mount
+      - ./config/redis:/usr/local/etc/redis:ro  # ✅ 配置 bind mount
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+# 注意：文件顶层不声明 volumes: 块（避免命名 volume）
+
+# .env 文件（应该被 .gitignore 排除）：
+# DB_USER=myapp
+# DB_PASSWORD=changeme
