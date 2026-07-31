@@ -96,7 +96,12 @@ install_claude_code() {
         # 已存在：询问是否覆盖
         echo -e "${YELLOW}⚠️  目标文件已存在: $target_file${NC}"
         echo -n "覆盖? [y/N] "
-        read -r ans
+        local ans=""
+        if read -r ans; then
+            :
+        else
+            ans="N"  # EOF 时默认不覆盖
+        fi
         if [[ ! "$ans" =~ ^[Yy]$ ]]; then
             echo -e "${BLUE}跳过 Claude Code${NC}"
             return 0
@@ -167,7 +172,12 @@ append_to_file() {
     if [ -f "$target" ] && grep -q "$MARKER_START" "$target" 2>/dev/null; then
         echo -e "${YELLOW}⚠️  $tool_name: $target 已包含此 skill${NC}"
         echo -n "替换已存在的内容? [y/N] "
-        read -r ans
+        local ans=""
+        if read -r ans; then
+            :
+        else
+            ans="N"  # EOF 时默认不替换
+        fi
         if [[ ! "$ans" =~ ^[Yy]$ ]]; then
             echo -e "${BLUE}跳过 $tool_name${NC}"
             return 0
@@ -429,8 +439,11 @@ multi_select() {
             'a'|'A')
                 # a: 全选 / 全不选（toggle）
                 local all_sel=1
+                local i
                 for ((i=0; i<total; i++)); do
-                    [ "${selected[$i]}" = "0" ] && all_sel=0
+                    if [ "${selected[$i]}" = "0" ]; then
+                        all_sel=0
+                    fi
                 done
                 for ((i=0; i<total; i++)); do
                     if [ $all_sel = 1 ]; then
@@ -469,9 +482,14 @@ multi_select() {
     __ms_cleanup
 
     # 输出 RESULT 数组
+    # 注意：不能用 `cond && cmd`（cond 假时返回 1，触发 set -e 退出）
+    # 必须用 if-then-else
     RESULT=()
+    local i
     for ((i=0; i<total; i++)); do
-        [ "${selected[$i]}" = "1" ] && RESULT+=("${options[$i]}")
+        if [ "${selected[$i]}" = "1" ]; then
+            RESULT+=("${options[$i]}")
+        fi
     done
 }
 
@@ -552,7 +570,15 @@ select_targets() {
 
     # 用 multi-select TUI 让用户选择
     multi_select "选择要安装到的 AI 工具：" "${detected[@]}"
-    SELECTED=("${RESULT[@]}")
+
+    # 复制 RESULT 到 SELECTED
+    # 注意：不能用 "${RESULT[@]}" splice 空数组（bash 4.x 会在 set -e 下触发退出）
+    SELECTED=()
+    if [ "${#RESULT[@]}" -gt 0 ]; then
+        for r in "${RESULT[@]}"; do
+            SELECTED+=("$r")
+        done
+    fi
 
     if [ ${#SELECTED[@]} -eq 0 ]; then
         echo -e "${YELLOW}未选择任何工具，退出${NC}"
@@ -569,7 +595,13 @@ select_targets() {
 
     # 让用户最后确认
     echo -n "确认安装到以上位置? [Y/n] "
-    read -r ans
+    # 注意：read 失败（EOF）时不能触发 set -e 退出脚本
+    local ans=""
+    if read -r ans; then
+        :
+    else
+        ans="Y"  # EOF 时默认确认
+    fi
     if [[ "$ans" =~ ^[Nn]$ ]]; then
         echo -e "${YELLOW}已取消${NC}"
         exit 0
