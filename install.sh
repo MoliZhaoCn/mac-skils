@@ -31,16 +31,16 @@ ALL_TOOLS=(
     "continue"
 )
 
-# 颜色
+# 颜色（注意：必须用 $'\033...' 形式，bash 单引号不会处理 \ 转义）
 if [ -t 1 ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    CYAN='\033[0;36m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m'
+    CYAN=$'\033[0;36m'
+    BOLD=$'\033[1m'
+    DIM=$'\033[2m'
+    NC=$'\033[0m'
 else
     RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
 fi
@@ -345,8 +345,8 @@ tui_checkbox() {
     trap 'printf "\033[?25h\n"' EXIT INT TERM
 
     render() {
-        # 移到顶部
-        printf '\033[H'
+        # 移到顶部并清屏
+        printf '\033[H\033[2J'
         printf '\033[1m%s\033[0m\n' "$title"
         printf '\n'
         local i
