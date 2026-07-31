@@ -1,0 +1,31 @@
+{
+  "name": "macos-to-linux-compat",
+  "version": "1.0.0",
+  "description": "macOS → Linux 兼容性 skill — 跨平台归档/传输 + 国内源配置",
+  "main": "bin/install.js",
+  "bin": {
+    "macos-to-linux-compat": "bin/install.js"
+  },
+  "scripts": {
+    "install": "node bin/install.js"
+  },
+  "keywords": [
+    "skill",
+    "macos",
+    "linux",
+    "tar",
+    "docker",
+    "china-mirror"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "files": [
+    "bin/",
+    "install.sh",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ]
+}

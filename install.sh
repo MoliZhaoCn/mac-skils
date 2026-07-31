@@ -19,7 +19,8 @@
 # 支持的工具: claude-code, cursor, aider, continue
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILL_FILE="$SCRIPT_DIR/SKILL.md"
+# SKILL.md 路径：优先用环境变量（npx 模式），否则用脚本同目录（独立运行模式）
+SKILL_FILE="${SKILL_FILE:-$SCRIPT_DIR/SKILL.md}"
 SKILL_NAME="macos-to-linux-compat"
 MARKER_START="<!-- macos-to-linux-compat:start -->"
 MARKER_END="<!-- macos-to-linux-compat:end -->"
@@ -506,18 +507,27 @@ cmd_list() {
 }
 
 cmd_help() {
+    local cmd_name="macos-to-linux-compat"
+
+    # 如果通过 npx 调用，显示 npx 用法
+    if [ -n "${npm_lifecycle_event:-}" ] || [ "$0" = "$cmd_name" ]; then
+        cmd_name="npx $cmd_name"
+    else
+        cmd_name="$0"
+    fi
+
     cat <<EOF
 ${BOLD}macos-to-linux-compat 安装工具${NC}
 
 ${BOLD}用法:${NC}
-  $0                    默认: add (添加 skill)
-  $0 add                添加 skill
-  $0 add all            添加所有检测到的工具
-  $0 add <tool>...      添加指定工具
-  $0 remove             移除 skill
-  $0 remove <tool>...   移除指定工具
-  $0 list               列出工具及检测状态
-  $0 help               显示此帮助
+  ${cmd_name}                  默认: add (添加 skill)
+  ${cmd_name} add              添加 skill
+  ${cmd_name} add all          添加所有检测到的工具
+  ${cmd_name} add <tool>...    添加指定工具
+  ${cmd_name} remove           移除 skill
+  ${cmd_name} remove <tool>... 移除指定工具
+  ${cmd_name} list             列出工具及检测状态
+  ${cmd_name} help             显示此帮助
 
 ${BOLD}支持的工具:${NC}
   claude-code   Claude Code
@@ -533,10 +543,10 @@ ${BOLD}支持的工具:${NC}
                 -> ~/.continue/config.json
 
 ${BOLD}示例:${NC}
-  $0                       # 交互式添加
-  $0 add claude-code       # 仅安装到 Claude Code
-  $0 add all               # 安装到所有检测到的工具
-  $0 remove aider          # 卸载 Aider
+  ${cmd_name}                       # 交互式添加
+  ${cmd_name} add claude-code       # 仅安装到 Claude Code
+  ${cmd_name} add all               # 安装到所有检测到的工具
+  ${cmd_name} remove aider          # 卸载 Aider
 
 ${BOLD}交互模式:${NC}
   工具列表以编号显示。输入编号（多个用逗号分隔）：
