@@ -32,39 +32,9 @@
 
 ## 安装
 
-### 一键安装（推荐）
+根据你使用的 AI 工具，把 `SKILL.md` 复制到对应位置。
 
-克隆仓库后，执行：
-
-```bash
-./install.sh
-```
-
-脚本会自动检测已安装的 AI 工具（Claude Code、Cursor、Aider、Continue），让你选择要安装到哪些工具，按提示操作即可。
-
-常用命令：
-
-```bash
-./install.sh --all                 # 安装到所有检测到的工具
-./install.sh claude-code           # 仅安装到 Claude Code
-./install.sh claude-code cursor    # 安装到指定工具
-./install.sh --list                # 查看检测状态
-./install.sh --uninstall           # 从所有工具卸载
-./install.sh --help                # 查看完整帮助
-```
-
-安装路径：
-
-- **Claude Code**：`~/.claude/skills/macos-to-linux-compat/SKILL.md`
-- **Cursor**：`./AGENTS.md`（如已存在则用 `./CLAUDE.md`）
-- **Aider**：`./CONVENTIONS.md`
-- **Continue**：`~/.continue/config.json`（合并到 `customInstructions`，需 `jq`）
-
-### 手动安装
-
-如果想手动设置：
-
-**Claude Code：**
+### Claude Code
 
 ```bash
 mkdir -p ~/.claude/skills/macos-to-linux-compat
@@ -73,13 +43,24 @@ cp SKILL.md ~/.claude/skills/macos-to-linux-compat/SKILL.md
 
 Claude Code 会自动加载 `~/.claude/skills/` 下的 skill。
 
-**Cursor / Aider / Continue / 其他：**
+### Cursor
 
-将 `SKILL.md` 的内容复制到项目的以下任意文件：
+把 `SKILL.md` 内容复制到项目的 `AGENTS.md`（或 `CLAUDE.md`）。
 
-- `AGENTS.md`，**或**
-- `CLAUDE.md`，**或**
-- 工具的系统提示配置
+### Aider
+
+把 `SKILL.md` 内容复制到项目的 `CONVENTIONS.md`。
+
+### Continue (VS Code)
+
+把 `SKILL.md` 内容（去掉 YAML frontmatter）合并到 `~/.continue/config.json` 的 `customInstructions` 字段：
+
+```bash
+# 需要 jq
+jq --arg ci "$(awk 'BEGIN{c=0}/^---$/{c++;next}c>=2{print}' SKILL.md)" \
+   '.customInstructions = $ci' ~/.continue/config.json > /tmp/config.json \
+&& mv /tmp/config.json ~/.continue/config.json
+```
 
 ## 快速开始
 
@@ -105,7 +86,6 @@ Claude Code 会自动加载 `~/.claude/skills/` 下的 skill。
 ├── SKILL.md                # 主规则文档（AI 读取）
 ├── README.md               # 英文 README
 ├── README.zh-CN.md         # 中文 README
-├── install.sh              # 一键安装脚本
 ├── scripts/
 │   ├── verify-archive.sh   # 验证归档干净
 │   ├── verify-sources.sh   # 验证源已替换
