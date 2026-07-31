@@ -341,8 +341,14 @@ tui_checkbox() {
 
     # 隐藏光标
     printf '\033[?25l'
-    # trap 恢复（不修改 set -e 行为）
-    trap 'printf "\033[?25h\n"' EXIT INT TERM
+    # 退出时的清理：
+    # - EXIT：脚本退出时恢复光标
+    # - INT (Ctrl-C)：必须显式 exit，否则 bash trap 默认不退出脚本，会卡在 read
+    # - TERM：同上
+    # 退出码 130 是 SIGINT 的标准退出码
+    trap 'printf "\033[?25h\n"' EXIT
+    trap 'printf "\033[?25h\n"; exit 130' INT
+    trap 'printf "\033[?25h\n"; exit 143' TERM
 
     render() {
         # 移到顶部并清屏
@@ -423,6 +429,7 @@ tui_checkbox() {
 
     # 恢复光标
     printf '\033[?25h\n'
+    # 清除所有 trap（避免影响后续 confirm 提示）
     trap - EXIT INT TERM
 
     # 输出结果
