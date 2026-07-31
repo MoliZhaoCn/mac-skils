@@ -322,17 +322,18 @@ detect_installed() {
 #
 # 用法: tui_checkbox "标题" 选项1 选项2 ...
 # 读全局变量 SELECTED (数组)
-# 键位: 数字键 1-9 切换对应项
+# 键位: ↑/↓ 移动高亮
+#       Space 切换当前项
 #       a 切换全选
-#       q 清空
 #       Enter 确认
-#       Ctrl-C 退出（清空）
+#       Ctrl-C 退出
 
 tui_checkbox() {
     local title="$1"
     shift
     local -a options=("$@")
     local total=${#options[@]}
+    local current=0
     local -a selected
     local i
     for ((i=0; i<total; i++)); do
@@ -341,39 +342,37 @@ tui_checkbox() {
 
     # 隐藏光标
     printf '\033[?25l'
-    # 退出时的清理：
-    # - EXIT：脚本退出时恢复光标
-    # - INT (Ctrl-C)：必须显式 exit，否则 bash trap 默认不退出脚本，会卡在 read
-    # - TERM：同上
-    # 退出码 130 是 SIGINT 的标准退出码
+    # 退出时清理（INT/TERM 必须显式 exit，否则 bash 默认不退出，read 会卡住）
     trap 'printf "\033[?25h\n"' EXIT
     trap 'printf "\033[?25h\n"; exit 130' INT
     trap 'printf "\033[?25h\n"; exit 143' TERM
 
     render() {
-        # 移到顶部并清屏
         printf '\033[H\033[2J'
         printf '\033[1m%s\033[0m\n' "$title"
         printf '\n'
         local i
         for ((i=0; i<total; i++)); do
-            local mark="  "
+            local mark
             if [ "${selected[$i]}" = "1" ]; then
-                mark="${GREEN}●${NC} "
+                mark="${GREEN}●${NC}"
             else
-                mark="${DIM}○${NC} "
+                mark="${DIM}○${NC}"
             fi
-            printf '  %s %d) %s\n' "$mark" "$((i+1))" "${options[$i]}"
+            if [ "$i" = "$current" ]; then
+                # 当前项：反色高亮
+                printf '\033[7m > %s %d) %s\033[0m\n' "$mark" "$((i+1))" "${options[$i]}"
+            else
+                printf '   %s %d) %s\n' "$mark" "$((i+1))" "${options[$i]}"
+            fi
         done
         printf '\n'
-        printf '\033[2m数字切换 · a 全选 · q 清空 · Enter 确认\033[0m'
+        printf '\033[2m↑/↓ 移动 · Space 切换 · a 全选 · Enter 确认\033[0m'
     }
 
-    # 首屏
     printf '\033[2J'
     render
 
-    # 主循环
     while true; do
         local key
         if ! IFS= read -r -s -n1 key 2>/dev/null; then
@@ -381,10 +380,48 @@ tui_checkbox() {
             break
         fi
 
+        # ESC 序列（方向键）
+        if [ "$key" = $'\x1b' ]; then
+            local seq=""
+            if IFS= read -r -s -n1 -t 0.3 seq 2>/dev/null; then
+                if [ "$seq" = "[" ] || [ "$seq" = "O" ]; then
+                    local final=""
+                    IFS= read -r -s -n1 -t 0.3 final 2>/dev/null || true
+                    seq="$seq$final"
+                fi
+                case "$seq" in
+                    '[A'|'OA'|'[D'|'OD')  # 上 / 左
+                        current=$((current - 1))
+                        if [ "$current" -lt 0 ]; then
+                            current=$((total - 1))
+                        fi
+                        render
+                        ;;
+                    '[B'|'OB'|'[C'|'OC')  # 下 / 右
+                        current=$((current + 1))
+                        if [ "$current" -ge "$total" ]; then
+                            current=0
+                        fi
+                        render
+                        ;;
+                esac
+            fi
+            continue
+        fi
+
         case "$key" in
             ''|$'\n'|$'\r')
                 # Enter
                 break
+                ;;
+            ' ')
+                # 空格：切换当前项
+                if [ "${selected[$current]}" = "1" ]; then
+                    selected[$current]=0
+                else
+                    selected[$current]=1
+                fi
+                render
                 ;;
             'a'|'A')
                 # 全选 toggle
@@ -404,32 +441,11 @@ tui_checkbox() {
                 done
                 render
                 ;;
-            'q'|'Q')
-                # 清空
-                local j
-                for ((j=0; j<total; j++)); do
-                    selected[$j]=0
-                done
-                render
-                ;;
-            [1-9])
-                # 数字键：切换对应项
-                local idx=$((key - 1))
-                if [ "$idx" -lt "$total" ]; then
-                    if [ "${selected[$idx]}" = "1" ]; then
-                        selected[$idx]=0
-                    else
-                        selected[$idx]=1
-                    fi
-                    render
-                fi
-                ;;
         esac
     done
 
     # 恢复光标
     printf '\033[?25h\n'
-    # 清除所有 trap（避免影响后续 confirm 提示）
     trap - EXIT INT TERM
 
     # 输出结果
