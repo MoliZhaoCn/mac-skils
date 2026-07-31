@@ -355,19 +355,19 @@ tui_checkbox() {
         for ((i=0; i<total; i++)); do
             local mark
             if [ "${selected[$i]}" = "1" ]; then
-                mark="${GREEN}●${NC}"
+                mark="[x]"
             else
-                mark="${DIM}○${NC}"
+                mark="[ ]"
             fi
             if [ "$i" = "$current" ]; then
                 # 当前项：反色高亮
-                printf '\033[7m > %s %d) %s\033[0m\n' "$mark" "$((i+1))" "${options[$i]}"
+                printf '\033[7m  > %s  %d) %s\033[0m\n' "$mark" "$((i+1))" "${options[$i]}"
             else
-                printf '   %s %d) %s\n' "$mark" "$((i+1))" "${options[$i]}"
+                printf '    %s  %d) %s\n' "$mark" "$((i+1))" "${options[$i]}"
             fi
         done
         printf '\n'
-        printf '\033[2m↑/↓ 移动 · Space 切换 · a 全选 · Enter 确认\033[0m'
+        printf '\033[2mMove: Up/Down  Toggle: Space  All: a  Quit: Esc/Ctrl-C  OK: Enter\033[0m'
     }
 
     printf '\033[2J'
