@@ -56,7 +56,7 @@ npx macos-to-linux-compat --uninstall                     # 卸载
 **从 GitHub 安装**（发布到 GitHub 后可跳过 `npm publish`）：
 
 ```bash
-npx github:你的用户名/mac-skils
+npx github:MoliZhaoCn/mac-skils
 ```
 
 ### 手动安装

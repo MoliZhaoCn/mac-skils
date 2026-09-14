@@ -56,7 +56,7 @@ npx macos-to-linux-compat --uninstall                     # remove
 **Install from GitHub** (skips `npm publish` once you push the repo):
 
 ```bash
-npx github:your-username/mac-skils
+npx github:MoliZhaoCn/mac-skils
 ```
 
 ### Manual Installation
