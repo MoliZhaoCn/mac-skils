@@ -32,36 +32,30 @@
 
 ## 安装
 
-### 推荐：一键 npx 安装
+### 方式 1（最推荐）：本地克隆 + 全局安装
+
+```bash
+git clone https://github.com/MoliZhaoCn/mac-skils.git
+cd mac-skils
+npm install -g .
+macos-to-linux-compat
+```
+
+只依赖 `git`，**完全不经过 `pacote`/`codeload.github.com`**，是所有环境都能跑通的最稳路径。装完之后 `macos-to-linux-compat` 命令在任意目录都可直接调用。
+
+### 方式 2：发布到 npm 后
+
+发布到 npm registry 后（推荐先发包再用这条）：
 
 ```bash
 npx macos-to-linux-compat
 ```
 
-运行后会：
-1. 自动检测已安装的 AI 工具（Claude Code / Cursor / Aider / Continue）
-2. 让你选择要安装到的目标（默认全选检测到的）
-3. 把 `SKILL.md`（以及 `scripts/`、`references/`）复制到对应位置
-4. **可选**：把跨平台核心规则追加到 `~/.claude/CLAUDE.md`（无需 Skill 调用即可生效）
+走 npm 官方 CDN，速度比 GitHub tarball 快几个数量级。
 
-**非交互模式**：
+### 方式 3：手动复制 SKILL.md
 
-```bash
-npx macos-to-linux-compat --tool=claude-code              # 仅 Claude Code
-npx macos-to-linux-compat --tool=cursor,claude-code       # 多个工具
-npx macos-to-linux-compat --all                           # 全部支持的工具
-npx macos-to-linux-compat --uninstall                     # 卸载
-```
-
-**从 GitHub 安装**（发布到 GitHub 后可跳过 `npm publish`）：
-
-```bash
-npx github:MoliZhaoCn/mac-skils
-```
-
-### 手动安装
-
-如果不想用 npx，根据 AI 工具把 `SKILL.md` 复制到对应位置：
+不想用 npm 时，根据 AI 工具把 `SKILL.md` 复制到对应位置：
 
 #### Claude Code
 
@@ -90,6 +84,26 @@ jq --arg ci "$(awk 'BEGIN{c=0}/^---$/{c++;next}c>=2{print}' SKILL.md)" \
    '.customInstructions = $ci' ~/.continue/config.json > /tmp/config.json \
 && mv /tmp/config.json ~/.continue/config.json
 ```
+
+### ⚠️ 关于 `npx github:...` 语法
+
+```bash
+# ⚠️ 已知在某些环境（macOS + npm 代理组合）下会卡在 pacote tarball 下载阶段
+npx github:MoliZhaoCn/mac-skils
+```
+
+如果卡住，先试：
+
+```bash
+# 1. 配置 npm 走代理
+npm config set https-proxy "$HTTPS_PROXY"
+npm config set proxy "$HTTP_PROXY"
+
+# 2. 或改用 git+https 语法（走 git clone 而非 tarball，通常能绕过）
+npx -y git+https://github.com/MoliZhaoCn/mac-skils.git
+```
+
+如果仍卡，请直接走**方式 1**（git clone + `npm install -g .`）。
 
 ## 快速开始
 

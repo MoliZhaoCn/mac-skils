@@ -32,36 +32,30 @@ This skill makes AI assistants automatically apply cross-platform-safe rules whe
 
 ## Installation
 
-### Recommended: One-Click via npx
+### Method 1 (Most Reliable): Local Clone + Global Install
+
+```bash
+git clone https://github.com/MoliZhaoCn/mac-skils.git
+cd mac-skils
+npm install -g .
+macos-to-linux-compat
+```
+
+This only depends on `git` and **bypasses `pacote`/`codeload.github.com` entirely** — the most reliable path that works in every environment. After install, the `macos-to-linux-compat` command is available from any directory.
+
+### Method 2: After Publishing to npm
+
+Once the package is published to the npm registry (recommended before using this):
 
 ```bash
 npx macos-to-linux-compat
 ```
 
-The installer will:
-1. Auto-detect installed AI tools (Claude Code / Cursor / Aider / Continue)
-2. Let you pick the target(s) — defaults to all detected
-3. Copy `SKILL.md` (plus `scripts/` and `references/`) to the right place
-4. **Optionally** append the cross-platform core rules to `~/.claude/CLAUDE.md` (always-on, no Skill invocation needed)
+Uses the npm CDN, orders of magnitude faster than GitHub tarballs.
 
-**Non-interactive mode**:
+### Method 3: Manual Install
 
-```bash
-npx macos-to-linux-compat --tool=claude-code              # Claude Code only
-npx macos-to-linux-compat --tool=cursor,claude-code       # multiple tools
-npx macos-to-linux-compat --all                           # every supported tool
-npx macos-to-linux-compat --uninstall                     # remove
-```
-
-**Install from GitHub** (skips `npm publish` once you push the repo):
-
-```bash
-npx github:MoliZhaoCn/mac-skils
-```
-
-### Manual Installation
-
-If you'd rather not use npx, pick your AI tool and copy `SKILL.md` to the right place.
+If you'd rather not use npm, pick your AI tool and copy `SKILL.md` to the right place.
 
 #### Claude Code
 
@@ -90,6 +84,26 @@ jq --arg ci "$(awk 'BEGIN{c=0}/^---$/{c++;next}c>=2{print}' SKILL.md)" \
    '.customInstructions = $ci' ~/.continue/config.json > /tmp/config.json \
 && mv /tmp/config.json ~/.continue/config.json
 ```
+
+### ⚠️ About `npx github:...` Syntax
+
+```bash
+# ⚠️ Known to hang in some environments (macOS + npm proxy combos)
+npx github:MoliZhaoCn/mac-skils
+```
+
+If it hangs, try:
+
+```bash
+# 1. Point npm at your proxy
+npm config set https-proxy "$HTTPS_PROXY"
+npm config set proxy "$HTTP_PROXY"
+
+# 2. Or use the git+https form (clones via git, usually bypasses the tarball issue)
+npx -y git+https://github.com/MoliZhaoCn/mac-skils.git
+```
+
+If it still hangs, fall back to **Method 1** (`git clone` + `npm install -g .`).
 
 ## Quick Start
 
