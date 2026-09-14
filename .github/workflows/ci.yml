@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate installer (Node ${{ matrix.node }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        node: [18, 20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Syntax check (bin/install.js)
+        run: node --check bin/install.js
+
+      - name: Verify required files exist
+        run: |
+          test -f SKILL.md
+          test -f scripts/detect-macos.sh
+          test -f scripts/verify-archive.sh
+          test -f scripts/verify-sources.sh
+          test -d references
+          test -x bin/install.js
+
+      - name: Validate package.json
+        run: node -e "const p=require('./package.json'); ['name','version','bin','files','repository','license'].forEach(k=>{if(!p[k])throw new Error('missing '+k)})"
+
+      - name: Smoke test — installer shows menu
+        shell: bash
+        run: |
+          output=$(echo "" | node bin/install.js 2>&1 || true)
+          echo "$output" | grep -q "macos-to-linux-compat 安装器" || (echo "❌ installer banner missing"; exit 1)
+          echo "$output" | grep -q "Claude Code" || (echo "❌ Claude Code entry missing"; exit 1)
+          echo "✓ installer banner and menu detected"
+
+  pack:
+    name: npm pack dry-run
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Pack dry-run (verify published file set)
+        run: npm pack --dry-run

@@ -1,0 +1,57 @@
+{
+  "name": "macos-to-linux-compat",
+  "version": "1.0.0",
+  "description": "一键安装 MacOS → Linux 跨平台兼容 skill 到 Claude Code / Cursor / Aider / Continue。解决 tar 打包后 Linux 端报'LIBARCHIVE.xattr.com.apple.provenance'警告、文件 uid 变 501 变无主、国内构建慢/Docker 拉镜像超时等问题。",
+  "bin": {
+    "macos-to-linux-compat": "bin/install.js"
+  },
+  "scripts": {
+    "install": "node bin/install.js",
+    "test": "node --check bin/install.js && node -e \"require('fs').accessSync('SKILL.md')\" && node -e \"require('fs').accessSync('scripts/detect-macos.sh')\"",
+    "lint": "node --check bin/install.js",
+    "pack:check": "npm pack --dry-run"
+  },
+  "files": [
+    "bin/",
+    "SKILL.md",
+    "scripts/",
+    "references/",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude-code",
+    "skill",
+    "macos",
+    "linux",
+    "cross-platform",
+    "tar",
+    "dockerfile",
+    "claude",
+    "cursor",
+    "aider",
+    "continue",
+    "ci-cd",
+    "macos-to-linux"
+  ],
+  "author": {
+    "name": "Moli Zhao",
+    "email": "zhaoxx@mail.gitlab.com",
+    "url": "https://github.com/MoliZhaoCn"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MoliZhaoCn/mac-skils.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MoliZhaoCn/mac-skils/issues"
+  },
+  "homepage": "https://github.com/MoliZhaoCn/mac-skils#readme",
+  "engines": {
+    "node": ">=14"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -32,9 +32,38 @@ This skill makes AI assistants automatically apply cross-platform-safe rules whe
 
 ## Installation
 
-Pick the AI tool you use and copy `SKILL.md` to the right place.
+### Recommended: One-Click via npx
 
-### Claude Code
+```bash
+npx macos-to-linux-compat
+```
+
+The installer will:
+1. Auto-detect installed AI tools (Claude Code / Cursor / Aider / Continue)
+2. Let you pick the target(s) — defaults to all detected
+3. Copy `SKILL.md` (plus `scripts/` and `references/`) to the right place
+4. **Optionally** append the cross-platform core rules to `~/.claude/CLAUDE.md` (always-on, no Skill invocation needed)
+
+**Non-interactive mode**:
+
+```bash
+npx macos-to-linux-compat --tool=claude-code              # Claude Code only
+npx macos-to-linux-compat --tool=cursor,claude-code       # multiple tools
+npx macos-to-linux-compat --all                           # every supported tool
+npx macos-to-linux-compat --uninstall                     # remove
+```
+
+**Install from GitHub** (skips `npm publish` once you push the repo):
+
+```bash
+npx github:your-username/mac-skils
+```
+
+### Manual Installation
+
+If you'd rather not use npx, pick your AI tool and copy `SKILL.md` to the right place.
+
+#### Claude Code
 
 ```bash
 mkdir -p ~/.claude/skills/macos-to-linux-compat
@@ -43,15 +72,15 @@ cp SKILL.md ~/.claude/skills/macos-to-linux-compat/SKILL.md
 
 Claude Code auto-loads skills from `~/.claude/skills/`.
 
-### Cursor
+#### Cursor
 
 Copy `SKILL.md` content into your project's `AGENTS.md` (or `CLAUDE.md`).
 
-### Aider
+#### Aider
 
 Copy `SKILL.md` content into your project's `CONVENTIONS.md`.
 
-### Continue (VS Code)
+#### Continue (VS Code)
 
 Merge `SKILL.md` content (excluding the YAML frontmatter) into your `~/.continue/config.json` as the `customInstructions` field:
 
@@ -86,6 +115,9 @@ Just work as usual — when AI detects macOS environment and you trigger any cro
 ├── SKILL.md                # Main rule document (AI reads this)
 ├── README.md               # English README
 ├── README.zh-CN.md         # Chinese README
+├── package.json           # npx installer config
+├── bin/
+│   └── install.js         # npx installer entry point
 ├── scripts/
 │   ├── verify-archive.sh   # Verify tar archive cleanliness
 │   ├── verify-sources.sh   # Verify source URLs replaced

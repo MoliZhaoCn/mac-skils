@@ -32,9 +32,38 @@
 
 ## 安装
 
-根据你使用的 AI 工具，把 `SKILL.md` 复制到对应位置。
+### 推荐：一键 npx 安装
 
-### Claude Code
+```bash
+npx macos-to-linux-compat
+```
+
+运行后会：
+1. 自动检测已安装的 AI 工具（Claude Code / Cursor / Aider / Continue）
+2. 让你选择要安装到的目标（默认全选检测到的）
+3. 把 `SKILL.md`（以及 `scripts/`、`references/`）复制到对应位置
+4. **可选**：把跨平台核心规则追加到 `~/.claude/CLAUDE.md`（无需 Skill 调用即可生效）
+
+**非交互模式**：
+
+```bash
+npx macos-to-linux-compat --tool=claude-code              # 仅 Claude Code
+npx macos-to-linux-compat --tool=cursor,claude-code       # 多个工具
+npx macos-to-linux-compat --all                           # 全部支持的工具
+npx macos-to-linux-compat --uninstall                     # 卸载
+```
+
+**从 GitHub 安装**（发布到 GitHub 后可跳过 `npm publish`）：
+
+```bash
+npx github:你的用户名/mac-skils
+```
+
+### 手动安装
+
+如果不想用 npx，根据 AI 工具把 `SKILL.md` 复制到对应位置：
+
+#### Claude Code
 
 ```bash
 mkdir -p ~/.claude/skills/macos-to-linux-compat
@@ -43,15 +72,15 @@ cp SKILL.md ~/.claude/skills/macos-to-linux-compat/SKILL.md
 
 Claude Code 会自动加载 `~/.claude/skills/` 下的 skill。
 
-### Cursor
+#### Cursor
 
 把 `SKILL.md` 内容复制到项目的 `AGENTS.md`（或 `CLAUDE.md`）。
 
-### Aider
+#### Aider
 
 把 `SKILL.md` 内容复制到项目的 `CONVENTIONS.md`。
 
-### Continue (VS Code)
+#### Continue (VS Code)
 
 把 `SKILL.md` 内容（去掉 YAML frontmatter）合并到 `~/.continue/config.json` 的 `customInstructions` 字段：
 
@@ -86,6 +115,9 @@ jq --arg ci "$(awk 'BEGIN{c=0}/^---$/{c++;next}c>=2{print}' SKILL.md)" \
 ├── SKILL.md                # 主规则文档（AI 读取）
 ├── README.md               # 英文 README
 ├── README.zh-CN.md         # 中文 README
+├── package.json           # npx 安装器配置
+├── bin/
+│   └── install.js         # npx 安装器主程序
 ├── scripts/
 │   ├── verify-archive.sh   # 验证归档干净
 │   ├── verify-sources.sh   # 验证源已替换

@@ -1,6 +1,6 @@
 ---
 name: macos-to-linux-compat
-description: 在 MacOS 上工作时自动应用跨平台归档/传输与国内源配置规则。覆盖 tar/zip/rsync/scp 的 Mac→Linux 兼容写法，Dockerfile 与 CI/CD 的国内源替换。
+description: 解决 tar 打包后 Linux 端报"忽略未知的扩展头关键字 LIBARCHIVE.xattr.com.apple.provenance"、文件 uid 变 501 变无主、国内构建慢/Docker 拉镜像超时、Dockerfile 国内换源、CI/CD 换源、docker-compose 持久化与端口选型等问题。触发词：跨平台、Linux 部署、压缩包、解压警告、tar 警告、换源、国内源、Dockerfile、CI、打包到 Linux。
 ---
 
 # MacOS → Linux 兼容性助手
